@@ -1,0 +1,87 @@
+replicaCount: 1
+
+# 메인 애플리케이션 (demo용 nginx)
+app:
+  name: demo-app
+  image:
+    repository: nginx
+    tag: "1.25-alpine"
+    pullPolicy: IfNotPresent
+  port: 8080
+  resources:
+    requests:
+      cpu: "50m"
+      memory: "64Mi"
+    limits:
+      cpu: "200m"
+      memory: "128Mi"
+
+# Envoy Sidecar 설정
+envoy:
+  image:
+    repository: envoyproxy/envoy
+    tag: "v1.29-latest"
+    pullPolicy: IfNotPresent
+  # 외부 트래픽을 받는 포트 (Envoy가 listen)
+  listenerPort: 10000
+  # Envoy admin 포트
+  adminPort: 9901
+  resources:
+    requests:
+      cpu: "50m"
+      memory: "64Mi"
+    limits:
+      cpu: "200m"
+      memory: "128Mi"
+
+# Service 설정
+service:
+  type: ClusterIP
+  # Envoy listener 포트를 외부에 노출
+  port: 80
+  targetPort: 10000
+  adminPort: 9901
+
+# Ingress (선택)
+ingress:
+  enabled: false
+  className: ""
+  annotations: {}
+  hosts:
+    - host: envoy-demo.local
+      paths:
+        - path: /
+          pathType: Prefix
+  tls: []
+
+# Pod 설정
+podAnnotations: {}
+podLabels: {}
+
+podSecurityContext: {}
+
+securityContext: {}
+
+nodeSelector: {}
+
+tolerations: []
+
+affinity: {}
+
+# Envoy 설정 (envoy.yaml 내용)
+envoyConfig:
+  # admin 인터페이스 설정
+  admin:
+    address:
+      socket_address:
+        address: 0.0.0.0
+        port_value: 9901
+
+  # static_resources 방식으로 설정
+  # listener → cluster(app) 로 프록시
+  listenerAddress: 0.0.0.0
+  # 업스트림(메인 앱) 연결 설정
+  upstreamHost: 127.0.0.1
+  upstreamPort: 8080
+  # 접근 로그 활성화
+  accessLog: true

@@ -1,0 +1,68 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ include "envoy-sidecar-demo.fullname" . }}-envoy-config
+  labels:
+    {{- include "envoy-sidecar-demo.labels" . | nindent 4 }}
+data:
+  envoy.yaml: |
+    admin:
+      address:
+        socket_address:
+          address: {{ .Values.envoyConfig.admin.address.socket_address.address }}
+          port_value: {{ .Values.envoy.adminPort }}
+
+    static_resources:
+      listeners:
+        - name: listener_0
+          address:
+            socket_address:
+              address: {{ .Values.envoyConfig.listenerAddress }}
+              port_value: {{ .Values.envoy.listenerPort }}
+          filter_chains:
+            - filters:
+                - name: envoy.filters.network.http_connection_manager
+                  typed_config:
+                    "@type": type.googleapis.com/envoy.extensions.filters.network.http_connection_manager.v3.HttpConnectionManager
+                    stat_prefix: ingress_http
+                    codec_type: AUTO
+                    {{- if .Values.envoyConfig.accessLog }}
+                    access_log:
+                      - name: envoy.access_loggers.stdout
+                        typed_config:
+                          "@type": type.googleapis.com/envoy.extensions.access_loggers.stream.v3.StdoutAccessLog
+                          log_format:
+                            text_format_source:
+                              inline_string: "[%START_TIME%] \"%REQ(:METHOD)% %REQ(X-ENVOY-ORIGINAL-PATH?:PATH)% %PROTOCOL%\" %RESPONSE_CODE% %RESPONSE_FLAGS% %BYTES_RECEIVED% %BYTES_SENT% %DURATION%ms \"%REQ(X-FORWARDED-FOR)%\" \"%REQ(USER-AGENT)%\"\n"
+                    {{- end }}
+                    route_config:
+                      name: local_route
+                      virtual_hosts:
+                        - name: local_service
+                          domains:
+                            - "*"
+                          routes:
+                            - match:
+                                prefix: "/"
+                              route:
+                                cluster: app_cluster
+                                timeout: 30s
+                    http_filters:
+                      - name: envoy.filters.http.router
+                        typed_config:
+                          "@type": type.googleapis.com/envoy.extensions.filters.http.router.v3.Router
+
+      clusters:
+        - name: app_cluster
+          connect_timeout: 5s
+          type: STATIC
+          lb_policy: ROUND_ROBIN
+          load_assignment:
+            cluster_name: app_cluster
+            endpoints:
+              - lb_endpoints:
+                  - endpoint:
+                      address:
+                        socket_address:
+                          address: {{ .Values.envoyConfig.upstreamHost }}
+                          port_value: {{ .Values.envoyConfig.upstreamPort }}

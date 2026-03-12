@@ -1,0 +1,21 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ include "envoy-sidecar-demo.fullname" . }}
+  labels:
+    {{- include "envoy-sidecar-demo.labels" . | nindent 4 }}
+spec:
+  type: {{ .Values.service.type }}
+  selector:
+    {{- include "envoy-sidecar-demo.selectorLabels" . | nindent 4 }}
+  ports:
+    # Envoy listener 포트 → 외부에서 접근하는 포트
+    - name: http
+      port: {{ .Values.service.port }}
+      targetPort: http-envoy
+      protocol: TCP
+    # Envoy admin 포트 (모니터링/디버그용)
+    - name: envoy-admin
+      port: {{ .Values.service.adminPort }}
+      targetPort: envoy-admin
+      protocol: TCP

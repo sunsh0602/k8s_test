@@ -1,0 +1,36 @@
+===========================================================
+  Envoy Sidecar Demo 배포 완료!
+===========================================================
+
+Pod 구조:
+  [Pod]
+   ├── [app: nginx:8080]   ← 메인 애플리케이션
+   └── [envoy:10000]       ← Sidecar Proxy (트래픽 수신)
+
+  외부 트래픽 흐름:
+  Client → Service(:80) → Envoy Sidecar(:10000) → App(:8080)
+
+1. Pod 상태 확인:
+   kubectl get pods -l app.kubernetes.io/name={{ include "envoy-sidecar-demo.name" . }}
+
+2. 앱 접근 (포트포워딩):
+   kubectl port-forward svc/{{ include "envoy-sidecar-demo.fullname" . }} 8080:80
+   → http://localhost:8080
+
+3. Envoy Admin 대시보드 접근:
+   kubectl port-forward svc/{{ include "envoy-sidecar-demo.fullname" . }} 9901:9901
+   → http://localhost:9901
+
+4. Envoy 주요 Admin 엔드포인트:
+   /stats         - 통계
+   /clusters      - 업스트림 클러스터 상태
+   /listeners     - 리스너 정보
+   /config_dump   - 전체 설정 덤프
+   /ready         - 헬스체크
+
+5. 로그 확인:
+   # 메인 앱 로그
+   kubectl logs -l app.kubernetes.io/name={{ include "envoy-sidecar-demo.name" . }} -c {{ .Values.app.name }}
+
+   # Envoy 사이드카 로그 (접근 로그 포함)
+   kubectl logs -l app.kubernetes.io/name={{ include "envoy-sidecar-demo.name" . }} -c envoy
