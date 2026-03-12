@@ -1,5 +1,6 @@
 ===========================================================
   Envoy Sidecar Demo 배포 완료!
+  Namespace: {{ .Values.namespace }}
 ===========================================================
 
 Pod 구조:
@@ -11,14 +12,14 @@ Pod 구조:
   Client → Service(:80) → Envoy Sidecar(:10000) → App(:8080)
 
 1. Pod 상태 확인:
-   kubectl get pods -l app.kubernetes.io/name={{ include "envoy-sidecar-demo.name" . }}
+   kubectl get pods -n {{ .Values.namespace }} -l app.kubernetes.io/name={{ include "envoy-sidecar-demo.name" . }}
 
 2. 앱 접근 (포트포워딩):
-   kubectl port-forward svc/{{ include "envoy-sidecar-demo.fullname" . }} 8080:80
+   kubectl port-forward -n {{ .Values.namespace }} svc/{{ include "envoy-sidecar-demo.fullname" . }} 8080:80
    → http://localhost:8080
 
 3. Envoy Admin 대시보드 접근:
-   kubectl port-forward svc/{{ include "envoy-sidecar-demo.fullname" . }} 9901:9901
+   kubectl port-forward -n {{ .Values.namespace }} svc/{{ include "envoy-sidecar-demo.fullname" . }} 9901:9901
    → http://localhost:9901
 
 4. Envoy 주요 Admin 엔드포인트:
@@ -30,7 +31,7 @@ Pod 구조:
 
 5. 로그 확인:
    # 메인 앱 로그
-   kubectl logs -l app.kubernetes.io/name={{ include "envoy-sidecar-demo.name" . }} -c {{ .Values.app.name }}
+   kubectl logs -n {{ .Values.namespace }} -l app.kubernetes.io/name={{ include "envoy-sidecar-demo.name" . }} -c {{ .Values.app.name }}
 
    # Envoy 사이드카 로그 (접근 로그 포함)
-   kubectl logs -l app.kubernetes.io/name={{ include "envoy-sidecar-demo.name" . }} -c envoy
+   kubectl logs -n {{ .Values.namespace }} -l app.kubernetes.io/name={{ include "envoy-sidecar-demo.name" . }} -c envoy

@@ -2,6 +2,7 @@ apiVersion: apps/v1
 kind: Deployment
 metadata:
   name: {{ include "envoy-sidecar-demo.fullname" . }}
+  namespace: {{ .Values.namespace }}
   labels:
     {{- include "envoy-sidecar-demo.labels" . | nindent 4 }}
 spec:
@@ -12,7 +13,6 @@ spec:
   template:
     metadata:
       annotations:
-        # envoy 설정 변경 시 Pod 재시작 트리거
         checksum/envoy-config: {{ include (print $.Template.BasePath "/configmap.yaml") . | sha256sum }}
         {{- with .Values.podAnnotations }}
         {{- toYaml . | nindent 8 }}

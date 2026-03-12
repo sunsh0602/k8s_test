@@ -6,7 +6,7 @@
 {{- end }}
 
 {{/*
-fullname 생성 (release-name + chart-name, 63자 제한)
+fullname 생성
 */}}
 {{- define "envoy-sidecar-demo.fullname" -}}
 {{- if .Values.fullnameOverride }}
@@ -22,7 +22,7 @@ fullname 생성 (release-name + chart-name, 63자 제한)
 {{- end }}
 
 {{/*
-차트 레이블 (chart name + version)
+차트 레이블
 */}}
 {{- define "envoy-sidecar-demo.chart" -}}
 {{- printf "%s-%s" .Chart.Name .Chart.Version | replace "+" "_" | trunc 63 | trimSuffix "-" }}
