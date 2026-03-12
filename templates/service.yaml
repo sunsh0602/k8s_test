@@ -14,7 +14,13 @@ spec:
       port: {{ .Values.service.port }}
       targetPort: http-envoy
       protocol: TCP
+      {{- if and (eq .Values.service.type "NodePort") .Values.service.nodePortHttp }}
+      nodePort: {{ .Values.service.nodePortHttp }}
+      {{- end }}
     - name: envoy-admin
       port: {{ .Values.service.adminPort }}
       targetPort: envoy-admin
       protocol: TCP
+      {{- if and (eq .Values.service.type "NodePort") .Values.service.nodePortAdmin }}
+      nodePort: {{ .Values.service.nodePortAdmin }}
+      {{- end }}

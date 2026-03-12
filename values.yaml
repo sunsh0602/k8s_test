@@ -37,11 +37,15 @@ envoy:
       memory: "128Mi"
 
 # Service 설정
+# type: ClusterIP → 클러스터 내부만 접근. 노드 IP로 접근하려면 NodePort 로 변경
 service:
-  type: ClusterIP
+  type: NodePort
   port: 80
   targetPort: 10000
   adminPort: 9901
+  # type 이 NodePort 일 때 사용 (미지정 시 클러스터가 포트 자동 할당)
+  nodePortHttp: null   # 예: 30080
+  nodePortAdmin: null  # 예: 30901
 
 # Ingress (선택)
 ingress:
