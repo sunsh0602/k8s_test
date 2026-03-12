@@ -9,7 +9,7 @@ app:
     repository: nginx
     tag: "1.25-alpine"
     pullPolicy: IfNotPresent
-  port: 8080
+  port: 80
   resources:
     requests:
       cpu: "50m"
@@ -72,5 +72,5 @@ envoyConfig:
         port_value: 9901
   listenerAddress: 0.0.0.0
   upstreamHost: 127.0.0.1
-  upstreamPort: 8080
+  upstreamPort: 80
   accessLog: true
