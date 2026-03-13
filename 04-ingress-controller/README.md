@@ -31,25 +31,40 @@ kubectl get svc -n default -l app.kubernetes.io/name=ingress-nginx
 
 ### 2) 테스트용 앱 + Ingress
 
+**Path 기반** 실습:
 ```bash
 kubectl apply -f deployment.yaml
-kubectl apply -f ingress.yaml
+kubectl apply -f ingress-path.yaml
+```
+
+**Host 기반** 실습 (app.local):
+```bash
+kubectl apply -f deployment.yaml
+kubectl apply -f ingress-host.yaml
 ```
 
 ### 3) MacBook에서 접속
 
-- Ingress Controller의 External IP 확인: `kubectl get svc`
-- Host 기반: `/etc/hosts`에 `192.168.137.101 app.local` 추가 후 `http://app.local/`
-- 또는 Path 기반: `http://<EXTERNAL-IP>/foo`, `http://<EXTERNAL-IP>/bar`
+- Ingress Controller의 External IP 확인: `kubectl get svc` (예: 192.168.137.101)
+
+- **Path 기반** (`ingress-path.yaml`): DNS/hosts 설정 없이 접속
+  - `http://<EXTERNAL-IP>/foo` → foo 서비스
+  - `http://<EXTERNAL-IP>/bar` → bar 서비스
+
+- **Host 기반** (`ingress-host.yaml`): MacBook에서 `/etc/hosts`에 추가 후 접속
+  - `192.168.137.101 app.local` (EXTERNAL-IP는 실제 값으로 변경)
+  - 브라우저: `http://app.local/` → foo 서비스
 
 ### 4) 정리
 
 ```bash
-kubectl delete -f ingress.yaml -f deployment.yaml
+kubectl delete -f ingress-path.yaml -f deployment.yaml
+# 또는 Host 기반 사용 시: kubectl delete -f ingress-host.yaml -f deployment.yaml
 helm uninstall ingress-nginx
 ```
 
 ## 매니페스트
 
-- `deployment.yaml` — Ingress에서 라우팅할 테스트 Deployment/Service
-- `ingress.yaml` — Host/Path 라우팅 예시 (이 환경에서 사용할 주소로 수정 가능)
+- `deployment.yaml` — Ingress에서 라우팅할 테스트 Deployment/Service (foo, bar)
+- `ingress-path.yaml` — Path 기반 라우팅 (/foo → foo, /bar → bar)
+- `ingress-host.yaml` — Host 기반 라우팅 (app.local → foo)

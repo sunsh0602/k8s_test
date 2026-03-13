@@ -1,0 +1,33 @@
+# Host 기반 라우팅: app.local -> foo
+# MacBook: /etc/hosts 에 "192.168.137.101 app.local" 추가 후 http://app.local/
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: demo-host
+spec:
+  ingressClassName: nginx
+  rules:
+    - host: app.local
+      http:
+        paths:
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: foo
+                port:
+                  number: 80
+          - path: /foo
+            pathType: Prefix
+            backend:
+              service:
+                name: foo
+                port:
+                  number: 80
+          - path: /bar
+            pathType: Prefix
+            backend:
+              service:
+                name: bar
+                port:
+                  number: 80
