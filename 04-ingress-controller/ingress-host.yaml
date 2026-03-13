@@ -1,5 +1,6 @@
-# Host 기반 라우팅: app.local -> foo
-# MacBook: /etc/hosts 에 "192.168.137.101 app.local" 추가 후 http://app.local/
+# Host 고정(app.local) + Path 분기: app.local/foo -> foo, app.local/bar -> bar
+# MacBook: /etc/hosts 에 "192.168.137.101 app.local" 추가 후
+#   http://app.local/foo, http://app.local/bar
 apiVersion: networking.k8s.io/v1
 kind: Ingress
 metadata:
@@ -10,13 +11,7 @@ spec:
     - host: app.local
       http:
         paths:
-          - path: /
-            pathType: Prefix
-            backend:
-              service:
-                name: foo
-                port:
-                  number: 80
+          # 구체적인 path를 위에 두어야 / 가 먼저 매칭되지 않음
           - path: /foo
             pathType: Prefix
             backend:
@@ -31,3 +26,10 @@ spec:
                 name: bar
                 port:
                   number: 80
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: app-lb
+                port:
+                  number: 8080
