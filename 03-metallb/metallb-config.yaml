@@ -1,0 +1,19 @@
+# MacBook + VMware Fusion 환경 (노드 192.168.137.10~12)
+# 노드와 겹치지 않는 구간을 MetalLB 풀로 사용
+apiVersion: metallb.io/v1beta1
+kind: IPAddressPool
+metadata:
+  name: default
+  namespace: metallb-system
+spec:
+  addresses:
+    - 192.168.137.100-192.168.137.120
+---
+apiVersion: metallb.io/v1beta1
+kind: L2Advertisement
+metadata:
+  name: default
+  namespace: metallb-system
+spec:
+  ipAddressPools:
+    - default

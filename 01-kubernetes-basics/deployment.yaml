@@ -1,0 +1,25 @@
+# 이 환경: Pod IP는 172.20.0.0/16 대역으로 할당됨
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: app
+  labels:
+    app: app
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: app
+  template:
+    metadata:
+      labels:
+        app: app
+    spec:
+      containers:
+        - name: app
+          image: hashicorp/http-echo
+          args:
+            - "-text=hello from pod"
+            - "-listen=:8080"
+          ports:
+            - containerPort: 8080

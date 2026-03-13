@@ -1,0 +1,25 @@
+# Path 기반 라우팅: /foo -> foo, /bar -> bar
+# MacBook: http://<Ingress-Controller-External-IP>/foo, /bar
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: demo
+spec:
+  ingressClassName: nginx
+  rules:
+    - http:
+        paths:
+          - path: /foo
+            pathType: Prefix
+            backend:
+              service:
+                name: foo
+                port:
+                  number: 80
+          - path: /bar
+            pathType: Prefix
+            backend:
+              service:
+                name: bar
+                port:
+                  number: 80

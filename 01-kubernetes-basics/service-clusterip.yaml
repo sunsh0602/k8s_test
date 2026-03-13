@@ -1,0 +1,12 @@
+# ClusterIP: 클러스터 내부에서만 접근 (172.30.x.x)
+apiVersion: v1
+kind: Service
+metadata:
+  name: app-service
+spec:
+  type: ClusterIP
+  selector:
+    app: app
+  ports:
+    - port: 8080
+      targetPort: 8080
