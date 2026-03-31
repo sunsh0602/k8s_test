@@ -1,0 +1,77 @@
+# Grafana — Mimir / Loki / Tempo 데이터소스 + 상호 링크(traces↔logs↔metrics)
+# chart: grafana/grafana
+adminUser: admin
+adminPassword: admin
+
+service:
+  type: LoadBalancer
+  port: 80
+
+persistence:
+  enabled: true
+  size: 2Gi
+
+resources:
+  requests:
+    cpu: 50m
+    memory: 128Mi
+  limits:
+    memory: 512Mi
+
+datasources:
+  datasources.yaml:
+    apiVersion: 1
+    datasources:
+      - name: Mimir
+        type: prometheus
+        uid: prom
+        access: proxy
+        url: http://mimir-gateway.monitoring.svc/prometheus
+        isDefault: true
+        jsonData:
+          httpMethod: POST
+          timeInterval: 30s
+      - name: Loki
+        type: loki
+        uid: loki
+        access: proxy
+        url: http://loki.monitoring.svc:3100
+        jsonData:
+          derivedFields:
+            # 로그에 W3C trace_id(32 hex) 또는 UUID가 있으면 Tempo로 점프 (첫 번째 캡처 그룹이 링크 값)
+            - datasourceUid: tempo
+              matcherRegex: '"trace_id"\s*:\s*"([a-fA-F0-9]{32})"'
+              name: TraceID
+              url: "${__value.raw}"
+              urlDisplayLabel: View trace
+            - datasourceUid: tempo
+              matcherRegex: "([a-f0-9]{8}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{12})"
+              name: TraceID-UUID
+              url: "${__value.raw}"
+              urlDisplayLabel: View trace
+      - name: Tempo
+        type: tempo
+        uid: tempo
+        access: proxy
+        url: http://tempo.monitoring.svc:3200
+        jsonData:
+          tracesToLogsV2:
+            datasourceUid: loki
+            spanStartTimeShift: "-1h"
+            spanEndTimeShift: "1h"
+            filterByTraceID: true
+            filterBySpanID: false
+          tracesToMetrics:
+            datasourceUid: prom
+          lokiSearch:
+            datasourceUid: loki
+          serviceMap:
+            datasourceUid: prom
+          nodeGraph:
+            enabled: true
+
+sidecar:
+  dashboards:
+    enabled: false
+  datasources:
+    enabled: false

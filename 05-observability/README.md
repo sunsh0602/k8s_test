@@ -1,145 +1,90 @@
-# 5. Observability
+# 5. Observability (LGTM)
 
-## 왜 중요한지
+Grafana Labs 스타일 **LGTM** 스택을 한 네임스페이스(`monitoring`)에 올리고, Grafana에서 **메트릭(Mimir)·로그(Loki)·트레이스(Tempo)** 가 서로 링크되도록 구성합니다.
 
-metrics / logs / tracing — 클러스터와 애플리케이션의 상태·성능·장애를 파악하려면 메트릭, 로그, 분산 트레이싱이 필요함.
+| 문자 | 구성 요소 | 역할 |
+|------|-----------|------|
+| **L** | Loki + Promtail | 파드 로그 수집·저장 |
+| **G** | Grafana | 통합 UI, Explore, 서비스 맵 |
+| **T** | Tempo | 분산 트레이싱(OTLP), 스팬 메트릭 → Mimir |
+| **M** | Mimir | Prometheus 호환 장기 메트릭 저장·쿼리 |
 
-## 이 환경에서 (MacBook + VMware Fusion)
+**추가**: `prometheus-community/prometheus` 차트로 클러스터/노드 메트릭을 스크랩한 뒤 **remote_write**로 Mimir에 넣습니다(로컬 Prometheus는 짧은 보존).
 
-- **사전 조건**: 3단계 MetalLB 설치 및 주소 풀(192.168.137.100~120) 설정 완료.
-- **접속**: Grafana/Jaeger UI는 LoadBalancer(MetalLB)로 노출 → MacBook에서 `http://192.168.137.1xx` 접속.
-- **리소스**: VM 메모리 절약을 위해 `values-monitoring.yaml`에서 요청/한도 축소. 부족하면 replica·retention 추가 조정.
+## 사전 조건
 
----
+- MetalLB 등으로 외부 접근이 필요하면 Grafana `LoadBalancer`가 IP를 받을 수 있어야 합니다 (`values/grafana.yaml`).
+- 스토리지: Mimir(MinIO)·Loki·Tempo·Prometheus·Grafana PVC — 클러스터에 기본 `StorageClass`가 있어야 합니다.
 
-## 1. Prometheus + Grafana (kube-prometheus-stack)
-
-### 1-1. Helm repo 추가 및 네임스페이스
+## 한 번에 정리 후 재설치
 
 ```bash
+cd 05-observability
+bash uninstall-legacy-monitoring.sh   # 기존 kube-prometheus / loki-stack / Jaeger 등 제거
+bash install-lgtm.sh                  # LGTM + Prom + Promtail 설치
+```
+
+Helm 저장소가 없으면 스크립트가 `grafana`, `prometheus-community` repo를 추가합니다.
+
+## 수동 설치(참고)
+
+```bash
+helm repo add grafana https://grafana.github.io/helm-charts
 helm repo add prometheus-community https://prometheus-community.github.io/helm-charts
 helm repo update
 kubectl create namespace monitoring
+
+helm install mimir grafana/mimir-distributed -n monitoring -f values/mimir.yaml
+helm install loki grafana/loki -n monitoring -f values/loki.yaml
+helm install tempo grafana/tempo -n monitoring -f values/tempo.yaml
+helm install prom prometheus-community/prometheus -n monitoring -f values/prometheus.yaml
+helm install promtail grafana/promtail -n monitoring -f values/promtail.yaml
+helm install grafana grafana/grafana -n monitoring -f values/grafana.yaml
 ```
 
-### 1-2. kube-prometheus-stack 설치
+## 연동 동작
 
-이 디렉토리에서 실행 (상위 k8s-local 루트에서면 `-f 05-observability/values-monitoring.yaml` 사용).
+- **Grafana → Mimir**: PromQL(Explore·대시보드). Mimir 게이트웨이가 비어 있는 `X-Scope-OrgID`에 기본 테넌트를 채웁니다.
+- **Grafana → Loki**: 로그 Explore. `derivedFields`로 로그의 trace id / UUID를 클릭하면 Tempo로 이동.
+- **Grafana → Tempo**: 트레이스 Explore. **traces to logs** → Loki, **traces to metrics / service map** → Mimir(Prometheus 타입).
+- **Promtail → Loki**: `values/promtail.yaml` 의 push URL.
+- **Prometheus → Mimir**: `values/prometheus.yaml` 의 `remoteWrite`.
+- **Tempo metrics-generator → Mimir**: 서비스 그래프·스팬 메트릭용 `remoteWriteUrl` (`values/tempo.yaml`).
+
+애플리케이션은 **OTLP**로 Tempo에내면 됩니다(클러스터 내부 `tempo.monitoring.svc:4317` gRPC, `:4318` HTTP).
+
+## 접속
 
 ```bash
-helm install kube-prometheus-stack prometheus-community/kube-prometheus-stack \
-  --namespace monitoring \
-  -f values-monitoring.yaml
+kubectl get svc -n monitoring grafana
 ```
 
-- `values-monitoring.yaml`: Grafana LoadBalancer, Prometheus/Alertmanager 등 리소스 절감.
+- 브라우저: `http://<EXTERNAL-IP>/` (LoadBalancer)
+- 계정: `admin` / `admin` — `values/grafana.yaml` 의 `adminPassword` 로 변경.
 
-### 1-3. Pod 기동 대기
+## 값 파일
 
-```bash
-kubectl get pods -n monitoring -w
-# Running 이 될 때까지 대기 (Ctrl+C로 종료)
-```
-
-또는 타임아웃으로 대기:
-
-```bash
-kubectl wait --for=condition=ready pod -l app.kubernetes.io/name=grafana -n monitoring --timeout=300s
-```
-
-### 1-4. Grafana 접속 주소 확인
-
-```bash
-kubectl get svc -n monitoring -l app.kubernetes.io/name=grafana
-```
-
-- `TYPE` 이 `LoadBalancer` 이고 `EXTERNAL-IP` 에 192.168.137.1xx 가 할당되면 MacBook 브라우저에서 접속 가능.
-
-### 1-5. Grafana 로그인
-
-- **URL**: `http://<EXTERNAL-IP>/` (예: http://192.168.137.101/)
-- **계정**: `admin`
-- **비밀번호**: `values-monitoring.yaml` 에 설정한 값 (`admin`). 변경했으면 해당 값 사용.
-
-비밀번호를 시크릿에서 확인하려면:
-
-```bash
-kubectl get secret -n monitoring kube-prometheus-stack-grafana -o jsonpath='{.data.admin-password}' | base64 -d
-echo
-```
-
-### 1-6. Prometheus 데이터소스 확인
-
-- Grafana 로그인 후 **Connections** → **Data sources** 에서 `Prometheus` 가 이미 등록되어 있음.
-- **Explore** 에서 PromQL 예: `up`, `node_memory_MemAvailable_bytes` 등으로 메트릭 확인.
-
-### 1-7. (선택) Prometheus UI 직접 접속
-
-Prometheus는 기본이 ClusterIP. 포트포워드로 접속:
-
-```bash
-kubectl port-forward -n monitoring svc/kube-prometheus-stack-prometheus 9090:9090
-# MacBook 브라우저: http://localhost:9090
-```
-
----
-
-## 2. Jaeger (분산 트레이싱, 선택)
-
-### 2-1. Jaeger all-in-one 배포
-
-```bash
-kubectl create namespace tracing
-kubectl apply -f jaeger-all-in-one.yaml
-```
-
-- `jaeger-all-in-one.yaml`: all-in-one 디플로이먼트 + LoadBalancer 서비스 (이 디렉토리에 있음).
-
-### 2-2. Jaeger UI 접속
-
-```bash
-kubectl get svc -n tracing
-```
-
-- `jaeger-all-in-one` 서비스의 `EXTERNAL-IP` (MetalLB)로 MacBook에서 접속.
-- **URL**: `http://<EXTERNAL-IP>:16686` (Jaeger UI)
-
-### 2-3. 정리
-
-```bash
-kubectl delete namespace tracing
-```
-
----
-
-## 3. 정리 (전체 제거)
-
-### Prometheus + Grafana 스택 제거
-
-```bash
-helm uninstall kube-prometheus-stack -n monitoring
-kubectl delete namespace monitoring
-```
-
-### (선택) PVC까지 삭제
-
-```bash
-kubectl delete pvc -n monitoring -l app.kubernetes.io/name=prometheus
-```
-
----
-
-## 매니페스트 요약
-
-| 파일 | 용도 |
+| 파일 | 설명 |
 |------|------|
-| `values-monitoring.yaml` | kube-prometheus-stack Helm values (Grafana LB, 리소스 절감) |
-| `jaeger-all-in-one.yaml` | Jaeger all-in-one + LoadBalancer (선택) |
+| `values/mimir.yaml` | classic 아키텍처(Kafka 끔), 단일 존·소형 리소스, 내장 MinIO |
+| `values/loki.yaml` | SingleBinary, 파일시스템 스토리지 |
+| `values/tempo.yaml` | 단일 레플리카, metrics generator → Mimir |
+| `values/prometheus.yaml` | 스크랩 + Mimir remote_write, Alertmanager/Pushgateway 끔 |
+| `values/promtail.yaml` | Loki push URL |
+| `values/grafana.yaml` | 데이터소스 3종 + Tempo↔Loki↔Mimir jsonData |
 
----
+**보안**: `values/mimir.yaml` 의 MinIO `rootPassword`, Grafana `adminPassword` 는 반드시 바꾸세요.
+
+## LGTM만 제거
+
+```bash
+helm uninstall grafana prom promtail tempo loki mimir -n monitoring
+kubectl delete pvc --all -n monitoring
+```
 
 ## 트러블슈팅
 
-- **Grafana External-IP가 pending**: MetalLB 미설치 또는 주소 풀 소진. 3단계 MetalLB 확인.
-- **Pod가 ImagePullBackOff**: 노드에서 외부 레지스트리 접근 가능한지 확인. 필요 시 이미지 풀 시크릿 설정.
-- **메모리 부족**: `values-monitoring.yaml` 에서 `prometheus.prometheusSpec.resources.limits.memory` 더 낮추거나, `retention` 을 1d 로 줄이기.
+- **PVC Pending**: StorageClass / OpenEBS 등 동적 프로비저닝 확인.
+- **Mimir Pod이 뜨지 않음**: 노드 메모리 부족 시 `values/mimir.yaml` 에서 각 컴포넌트 `limits.memory` 를 더 낮춤.
+- **Grafana에서 Mimir 쿼리 빈 결과**: `kubectl logs -n monitoring deploy/prom-prometheus-server` 로 remote_write 오류 확인, `mimir-gateway` 가 Ready 인지 확인.
+- **서비스 맵이 비어 있음**: Tempo로 실제 트래픽이 들어오고 metrics-generator가 켜져 있어야 하며, Mimir에 스팬 메트릭이 remote write 되는지 확인.

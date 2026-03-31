@@ -1,0 +1,29 @@
+# Grafana Tempo — 단일 바이너리, Mimir로 메트릭 생성기 remote_write (서비스 맵·스팬 메트릭)
+# chart: grafana/tempo
+replicas: 1
+
+service:
+  type: ClusterIP
+
+tempo:
+  resources:
+    requests:
+      cpu: 100m
+      memory: 512Mi
+    limits:
+      memory: 1Gi
+  retention: 48h
+  multitenancyEnabled: false
+  reportingEnabled: false
+  memBallastSizeMbs: 256
+  metricsGenerator:
+    enabled: true
+    remoteWriteUrl: http://mimir-gateway.monitoring.svc/api/v1/push
+    processor:
+      service_graphs:
+        max_items: 10000
+      span_metrics: {}
+
+persistence:
+  enabled: true
+  size: 10Gi

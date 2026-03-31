@@ -1,0 +1,58 @@
+# Grafana Loki — SingleBinary + 로컬 파일시스템 (객체 스토리지 없음)
+# chart: grafana/loki
+deploymentMode: SingleBinary
+
+write:
+  replicas: 0
+read:
+  replicas: 0
+backend:
+  replicas: 0
+
+singleBinary:
+  replicas: 1
+  resources:
+    requests:
+      cpu: 100m
+      memory: 384Mi
+    limits:
+      memory: 768Mi
+  persistence:
+    enabled: true
+    size: 10Gi
+
+lokiCanary:
+  enabled: false
+
+# Helm test 훅은 Canary에 의존 → 랩 환경에선 비활성화
+test:
+  enabled: false
+
+gateway:
+  enabled: false
+
+chunksCache:
+  enabled: false
+resultsCache:
+  enabled: false
+memcached:
+  enabled: false
+
+loki:
+  commonConfig:
+    replication_factor: 1
+  storage:
+    type: filesystem
+  schemaConfig:
+    configs:
+      - from: "2024-04-01"
+        store: tsdb
+        object_store: filesystem
+        schema: v13
+        index:
+          prefix: index_
+          period: 24h
+  limits_config:
+    retention_period: 168h
+    reject_old_samples: true
+    reject_old_samples_max_age: 168h
